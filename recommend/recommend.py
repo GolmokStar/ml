@@ -1,9 +1,11 @@
 from datetime import datetime
 import pandas as pd
-
+from flask import Flask, request, jsonify
 from sklearn.metrics.pairwise import cosine_similarity
 
 import pymysql
+
+app = Flask(__name__)
 
 conn = pymysql.connect(host='00.00.000.000',
                         user='abc',
@@ -134,6 +136,8 @@ def recommend_places(user_id):
     # (9) 추천 장소 선정 (상위 5개)
     recommended_places = place_scores.sort_values("score", ascending=False).head(5)
 
+    
+
     recommendation_df = pd.DataFrame({
         "placeId": recommended_places["placeId"].values,
         "type": recommended_places["type"].values,
@@ -169,6 +173,10 @@ def recommend_places(user_id):
             trans.rollback()
             print("DB 업데이트 중 오류 발생:", e)
 
+        # MySQL 연결 종료
+        cursor.close()
+        conn.close()
+
     return recommended_places[["placeName", "latitude", "longitude"]].reset_index(drop=True)
 
 # 사용자의 추천 장소 확인
@@ -194,7 +202,14 @@ def save_recommendations(user_id, recommendations):
 
     conn.commit()
 
+@app.route('/recommend', methods=['GET'])
+def get_recommendations():
+    user_id = request.args.get("user_id", type=int)
+    if not user_id:
+        return jsonify({"error": "user_id is required"}), 400
 
-# MySQL 연결 종료
-cursor.close()
-conn.close()
+    recommendations = recommend_places(user_id)
+    return jsonify(recommendations)
+
+if __name__ == '__main__':
+    app.run(host="0.0.0.0", port=5000, debug=True)
