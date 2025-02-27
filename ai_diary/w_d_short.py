@@ -4,6 +4,8 @@ from openai import OpenAI
 from sqlalchemy import create_engine
 from dotenv import load_dotenv
 import os
+from flask import Response
+import json
 
 # .env 강제 로드
 load_dotenv(override=True)
@@ -117,14 +119,21 @@ def recommend_diary():
         except Exception as e:
             return jsonify({"error": "OpenAI API 호출 실패", "details": str(e)}), 500
 
-        # API 응답
-        return jsonify({
+        # JSON 응답을 UTF-8로 처리
+        response_data = {
             "diary_date": today,
             "user_id": user_id,
             "keywords": keywords,
             "ai_draft": diary_entry_content
-        }), 200, {"Content-Type": "application/json; charset=utf-8"}
+        }
 
+        response = Response(
+            json.dumps(response_data, ensure_ascii=False), 
+            status=200, 
+            mimetype="application/json; charset=utf-8"
+        )
+
+        return response
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
