@@ -7,7 +7,7 @@ from sqlalchemy import create_engine
 app = Flask(__name__)
 
 # 환경 변수에서 API 키 가져오기
-client = OpenAI(api_key="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")
+client = OpenAI(api_key="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")
 
 # DB 연결 설정
 DATABASE_URL = "mysql+pymysql://yeonju:password@34.64.119.157/golmok"
