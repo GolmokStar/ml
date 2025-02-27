@@ -1,19 +1,13 @@
-import os
 import pandas as pd
 from flask import Flask, request, jsonify
-from dotenv import load_dotenv
 from openai import OpenAI
 from sqlalchemy import create_engine
-
-# .env 강제 로드
-load_dotenv(override=True)
 
 # Flask 앱 생성
 app = Flask(__name__)
 
 # 환경 변수에서 API 키 가져오기
-api_key = os.getenv("OPENAI_API_KEY")
-client = OpenAI(api_key=api_key)
+client = OpenAI(api_key="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")
 
 # DB 연결 설정
 DATABASE_URL = "mysql+pymysql://yeonju:password@34.64.119.157/golmok"
