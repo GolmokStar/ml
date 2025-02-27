@@ -43,9 +43,10 @@ for table, columns in date_columns.items():
             locals()[f"{table}_data"][col] = pd.to_datetime(locals()[f"{table}_data"][col], errors="coerce")
 
 # 데이터 병합
-pin_place_data = pd.merge(map_pin_data, place_data, on="place_id", how="left")  # MapPin + 장소 데이터
+pin_place_data = pd.merge(place_data, map_pin_data, on="place_id", how="left")  # MapPin + 장소 데이터
 place_trip_data = pd.merge(pin_place_data, trip_data, on="trip_id", how="left") # MapPin + 장소 데이터 + 여행 기록
-keyword_data = place_trip_data[["title", "start_date", "end_date", "place_name", "type"]].copy()
+keyword_data = place_trip_data[["title", "start_date", "end_date", "place_name_y", "type"]].copy()
+keyword_data = keyword_data.rename(columns={"place_name_y": "place_name"})
 
 
 # 추천 일기 생성 API
