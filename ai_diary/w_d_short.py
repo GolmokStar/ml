@@ -15,9 +15,15 @@ app = Flask(__name__)
 api_key = os.getenv("OPENAI_API_KEY")
 client = OpenAI(api_key=api_key)
 
-# 데이터베이스에서 여행 정보 가져오기
-def get_trip_info(tripid):
+# 데이터베이스 연결 함수
+def get_db_connection():
     conn = sqlite3.connect("demoDB.db")
+    conn.row_factory = sqlite3.Row
+    return conn
+
+# 여행 정보 가져오기
+def get_trip_info(tripid):
+    conn = get_db_connection()
     cursor = conn.cursor()
     
     cursor.execute("SELECT title, startDate, endDate FROM Trip WHERE id = ?", (tripid,))
@@ -26,9 +32,9 @@ def get_trip_info(tripid):
     conn.close()
     return result if result else ("알 수 없는 여행", "날짜 없음", "날짜 없음")
 
-# 데이터베이스에서 장소 정보 가져오기
+# 장소 정보 가져오기
 def get_place_info(place_name):
-    conn = sqlite3.connect("demoDB.db")
+    conn = get_db_connection()
     cursor = conn.cursor()
     
     cursor.execute("SELECT type FROM Place WHERE placeName = ?", (place_name,))
@@ -41,17 +47,13 @@ def get_place_info(place_name):
 @app.route('/recommend', methods=['GET'])
 def recommend_diary():
     try:
-        # 요청 파라미터 가져오기
         tripid = request.args.get('tripid', type=int)
         place = request.args.get('place', type=str)
 
         if not tripid or not place:
             return jsonify({"error": "tripid와 place를 모두 제공해야 합니다."}), 400
 
-        # 날짜 가져오기
         today = datetime.date.today().strftime("%Y-%m-%d")
-
-        # 여행 정보 가져오기
         trip_title, trip_start, trip_end = get_trip_info(tripid)
         selected_place, place_type = get_place_info(place)
 
@@ -65,26 +67,46 @@ def recommend_diary():
 
         # OpenAI API 호출
         chat_completion = client.chat.completions.create(
-            messages=[
-                {"role": "system", "content": "너는 친절한 일기 작가야. 간결하고 자연스러운 문장을 사용해."},
-                {"role": "user", "content": prompt}
-            ],
+            messages=[{"role": "system", "content": "너는 친절한 일기 작가야. 간결하고 자연스러운 문장을 사용해."},
+                      {"role": "user", "content": prompt}],
             model="gpt-3.5-turbo",
             temperature=0.7,
             max_tokens=150
         )
 
-        # 응답 저장
         diary_entry = chat_completion.choices[0].message.content.strip()
 
-        # 결과 반환
+        # 데이터베이스에 저장 (aiDraft 칼럼에 일기 내용 저장)
+        conn = get_db_connection()
+        cursor = conn.cursor()
+
+        # tripid가 이미 존재하는지 확인
+        cursor.execute("SELECT * FROM Diary WHERE tripid = ?", (tripid,))
+        existing_entry = cursor.fetchone()
+
+        if existing_entry:
+            # 존재하면 업데이트
+            cursor.execute(
+                "UPDATE Diary SET aiDraft = ? WHERE tripid = ?",
+                (diary_entry, tripid)
+            )
+        else:
+            # 존재하지 않으면 삽입
+            cursor.execute(
+                "INSERT INTO Diary (tripid, date, place, aiDraft) VALUES (?, ?, ?, ?)",
+                (tripid, today, selected_place, diary_entry)
+            )
+
+        conn.commit()
+        conn.close()
+
         return jsonify({
             "date": today,
             "tripTitle": trip_title,
             "tripPeriod": f"{trip_start} ~ {trip_end}",
             "place": selected_place,
             "placeType": place_type,
-            "diaryEntry": diary_entry
+            "aiDraft": diary_entry  # aiDraft를 반환
         })
 
     except Exception as e:
