@@ -64,8 +64,8 @@ def recommend_diary():
 
         # keyword_data에서 해당 날짜에 맞는 키워드를 조회
         # 'selected_date'와 'start_date', 'end_date' 비교
-        filtered_data = keyword_data[(keyword_data['start_date'] <= selected_date) & 
-                                     (keyword_data['end_date'] >= selected_date)]
+        filtered_data = keyword_data[(keyword_data['start_date'].dt.date <= selected_date) & 
+                                     (keyword_data['end_date'].dt.date >= selected_date)]
 
         if filtered_data.empty:
             return jsonify({"error": "선택한 날짜에 대한 장소 정보가 없습니다."}), 400
