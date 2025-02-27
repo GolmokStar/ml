@@ -21,6 +21,7 @@ engine = create_engine(DATABASE_URL, echo=True)
 
 # SQL 쿼리 딕셔너리
 queries = {
+    "user": "SELECT * FROM user",
     "trip": "SELECT * FROM trip",
     "place": "SELECT * FROM place",
     "map_pin": "SELECT * FROM map_pin",
@@ -28,6 +29,7 @@ queries = {
 
 # 데이터 가져오기 (Pandas DataFrame 변환)
 with engine.connect() as conn:
+    user_data = pd.read_sql_query(queries["user"], conn)
     trip_data = pd.read_sql_query(queries["trip"], conn)
     place_data = pd.read_sql_query(queries["place"], conn)
     map_pin_data = pd.read_sql_query(queries["map_pin"], conn)
@@ -49,6 +51,9 @@ place_trip_data = pd.merge(pin_trip_data, place_data, on="place_name", how="left
 # keyword_data 생성
 keyword_data = place_trip_data[["title", "start_date", "end_date", "place_name", "type"]].copy()
 
+keyword_data["start_date"] = keyword_data["start_date"].dt.date
+keyword_data["end_date"] = keyword_data["end_date"].dt.date
+
 
 # 추천 일기 생성 API
 @app.route('/diary', methods=['GET'])
@@ -56,25 +61,40 @@ def recommend_diary():
     try:
         # 사용자 요청에서 날짜를 가져옵니다.
         selected_date = request.args.get('selected_date')  # 선택한 날짜 (yyyy-mm-dd)
+        user_id = request.args.get('user_id')  # 사용자 ID
+        
         if not selected_date:
             return jsonify({"error": "날짜를 선택해 주세요."}), 400
+        if not user_id:
+            return jsonify({"error": "user_id가 필요합니다."}), 400
+        
+        # user_id를 정수형으로 변환 (예외 처리)
+        try:
+            user_id = int(user_id)
+        except ValueError:
+            return jsonify({"error": "user_id는 숫자여야 합니다."}), 400
 
         # 'selected_date'를 datetime 객체로 변환
         selected_date = pd.to_datetime(selected_date).date()
 
-        # keyword_data에서 해당 날짜에 맞는 키워드를 조회
-        # 'selected_date'와 'start_date', 'end_date' 비교
-        filtered_data = keyword_data[(keyword_data['start_date'].dt.date <= selected_date) & 
-                                     (keyword_data['end_date'].dt.date >= selected_date)]
+        # 🔹 유저 ID로 여행 데이터 필터링
+        user_trips = trip_data[trip_data["user_id"] == user_id]
+
+        if user_trips.empty:
+            return jsonify({"error": "해당 user_id에 대한 여행 기록이 없습니다."}), 400
+
+        # 🔹 여행 기록이 있는 user_id에 대해 keyword_data 필터링
+        filtered_data = keyword_data[
+            (keyword_data["start_date"] <= selected_date) &
+            (keyword_data["end_date"] >= selected_date) &
+            (keyword_data["title"].isin(user_trips["title"]))  # 해당 유저의 여행 기록만 필터링
+        ]
 
         if filtered_data.empty:
             return jsonify({"error": "선택한 날짜에 대한 장소 정보가 없습니다."}), 400
 
-        # 선택된 날짜에 해당하는 장소 이름과 타입을 키워드로 생성
-        keywords = []
-        for _, row in filtered_data.iterrows():
-            place_info = f"{row['place_name']} ({row['type']})"
-            keywords.append(place_info)
+        # 🔹 선택된 날짜에 해당하는 장소 이름과 타입을 키워드로 생성
+        keywords = [f"{row['place_name']} ({row['type']})" for _, row in filtered_data.iterrows()]
 
         # OpenAI 프롬프트 설정
         today = pd.to_datetime("today").strftime("%Y-%m-%d")
@@ -100,6 +120,7 @@ def recommend_diary():
         # API 응답
         return jsonify({
             "diary_date": today,
+            "user_id": user_id,
             "keywords": keywords,
             "ai_draft": diary_entry_content
         })
