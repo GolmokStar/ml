@@ -123,7 +123,7 @@ def recommend_diary():
             "user_id": user_id,
             "keywords": keywords,
             "ai_draft": diary_entry_content
-        })
+        }), 200, {"Content-Type": "application/json; charset=utf-8"}
 
     except Exception as e:
         return jsonify({"error": str(e)}), 500
