@@ -77,13 +77,13 @@ def recommend_diary():
         # 'selected_date'를 datetime 객체로 변환
         selected_date = pd.to_datetime(selected_date).date()
 
-        # 🔹 유저 ID로 여행 데이터 필터링
+        # 유저 ID로 여행 데이터 필터링
         user_trips = trip_data[trip_data["user_id"] == user_id]
 
         if user_trips.empty:
             return jsonify({"error": "해당 user_id에 대한 여행 기록이 없습니다."}), 400
 
-        # 🔹 여행 기록이 있는 user_id에 대해 keyword_data 필터링
+        # 여행 기록이 있는 user_id에 대해 keyword_data 필터링
         filtered_data = keyword_data[
             (keyword_data["start_date"] <= selected_date) &
             (keyword_data["end_date"] >= selected_date) &
@@ -93,7 +93,7 @@ def recommend_diary():
         if filtered_data.empty:
             return jsonify({"error": "선택한 날짜에 대한 장소 정보가 없습니다."}), 400
 
-        # 🔹 선택된 날짜에 해당하는 장소 이름과 타입을 키워드로 생성
+        # 선택된 날짜에 해당하는 장소 이름과 타입을 키워드로 생성
         keywords = [f"{row['place_name']} ({row['type']})" for _, row in filtered_data.iterrows()]
 
         # OpenAI 프롬프트 설정
